@@ -601,13 +601,16 @@ function buildMini(parent,r,stage,seed){
       const px=p[0]*r, py=p[1]*r;
       const col=i%2===0?C.chromG:C.chromP;
       const str=i%2===0?C.chromGe:C.chromPe;
-      const apexY=py-r*0.18;
-      [-1,1].forEach(sgn=>{
-        const d=`M${px},${apexY} Q${px+sgn*r*0.05},${py} `+
-                `${px+sgn*r*0.10},${py+r*0.16}`;
+      const halfWidth=r*0.10, halfHeight=r*0.20;
+      [
+        `M${px-halfWidth},${py-halfHeight} Q${px-halfWidth*0.55},${py} `+
+          `${px},${py} Q${px+halfWidth*0.55},${py} ${px+halfWidth},${py+halfHeight}`,
+        `M${px+halfWidth},${py-halfHeight} Q${px+halfWidth*0.55},${py} `+
+          `${px},${py} Q${px-halfWidth*0.55},${py} ${px-halfWidth},${py+halfHeight}`
+      ].forEach(d=>{
         miniChrom(d,col,str,r*0.058);
       });
-      svgEl('circle',{cx:px,cy:apexY,r:r*0.026,fill:str},g);
+      svgEl('circle',{cx:px,cy:py,r:r*0.026,fill:str},g);
     });
   }
   else if(stage===1){ /* METAPHASE */
@@ -750,7 +753,7 @@ for(let i=0;i<SPINDLE_N;i++){
 const astraPaths=[];
 for(let i=0;i<ASTRA_N;i++){
   astraPaths.push(svgEl('path',{d:'',fill:'none',stroke:C.spindle,
-    'stroke-width':1.2,'stroke-linecap':'round',opacity:.85},spindleG));
+  'stroke-width':1.2,'stroke-linecap':'round',opacity:.85},spindleG));
 }
 
 /* new nuclei (telophase) */
@@ -1082,6 +1085,10 @@ function renderCell(t){
   /* spindle fibres */
   const spinGrow=smooth(clamp((t-(T.proStart+6))/14,0,1));
   const attachGrow=smooth(clamp((t-T.metaStart)/8,0,1));
+  const proFiberGrow=smooth(clamp(
+    (t-(T.proStart+8))/(T.metaStart-(T.proStart+8)),0,1));
+  const fiberGrow=t<T.metaStart?0.52*proFiberGrow:
+    lerp(0.52,1,attachGrow);
   const spinOp  =kf(t,[[T.proStart+2,0],[T.proStart+8,1],
                         [T.teloStart,1],[T.teloEnd,0],[184,0]]);
   setOp(spindleG,spinOp);
@@ -1104,23 +1111,27 @@ function renderCell(t){
           `M${pole.x.toFixed(1)},${pole.y.toFixed(1)} `+
           `Q${(mx+nx*bow).toFixed(1)},${(my+ny*bow).toFixed(1)} `+
           `${kx.toFixed(1)},${ky.toFixed(1)}`);
-        path.setAttribute('stroke-dashoffset',(1-attachGrow).toFixed(3));
-        path.setAttribute('opacity',attachGrow.toFixed(3));
+        path.setAttribute('stroke-dashoffset',(1-fiberGrow).toFixed(3));
+        path.setAttribute('opacity',spinGrow.toFixed(3));
       }
     }
     /* astral */
     let a2=0;
     [poleL,poleR].forEach((pole,ps)=>{
       for(let i=0;i<7;i++){
-        const ang=(ps===0?Math.PI:0)+(i-3)*0.42;
-        const L=58+(i%3)*14;
-        const ex=pole.x+Math.cos(ang)*L;
-        const ey=pole.y+Math.sin(ang)*L;
+        const ang=(ps===0?0:Math.PI)+(i-3)*0.42;
+        const ux=Math.cos(ang), uy=Math.sin(ang);
+        const projection=pole.x*ux+pole.y*uy;
+        const edgeDistance=-projection+Math.sqrt(Math.max(0,
+          projection*projection+R*R-pole.x*pole.x-pole.y*pole.y));
+        const L=Math.min(58+(i%3)*14,edgeDistance*0.94);
+        const ex=pole.x+ux*L;
+        const ey=pole.y+uy*L;
         const path=astraPaths[a2++];
         path.setAttribute('d',
           `M${pole.x.toFixed(1)},${pole.y.toFixed(1)} `+
-          `Q${(pole.x+Math.cos(ang)*L*0.55).toFixed(1)},`+
-          `${(pole.y+Math.sin(ang)*L*0.55).toFixed(1)} `+
+          `Q${(pole.x+ux*L*0.55).toFixed(1)},`+
+          `${(pole.y+uy*L*0.55).toFixed(1)} `+
           `${ex.toFixed(1)},${ey.toFixed(1)}`);
         path.setAttribute('opacity',(0.85*spinGrow).toFixed(3));
       }
